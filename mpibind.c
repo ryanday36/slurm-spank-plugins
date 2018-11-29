@@ -617,7 +617,7 @@ static char *get_gpustring( int32_t gpus, int32_t numas, uint32_t *numagroup )
                     if( j==0 ){
                         asprintf(&str,"%d",gpus_in_numa[mapped_numa][j]);
                     }else{
-                        asprintf(&str,"%s %d",str, gpus_in_numa[mapped_numa][j]);
+                        asprintf(&str,"%s,%d",str, gpus_in_numa[mapped_numa][j]);
                     }
                 }
            }
