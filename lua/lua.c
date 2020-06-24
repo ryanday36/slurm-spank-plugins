@@ -819,6 +819,23 @@ static const struct luaL_Reg spank_functions [] = {
     { NULL,                   NULL },
 };
 
+#if !defined LUA_VERSION_NUM || LUA_VERSION_NUM <= 501
+/*
+** Adapted from Lua 5.2.0
+*/
+void luaL_setfuncs (lua_State *L, const luaL_Reg *l, int nup) {
+    luaL_checkstack(L, nup+1, "too many upvalues");
+    for (; l->name != NULL; l++) {  /* fill the table with given functions */
+        int i;
+        lua_pushstring(L, l->name);
+        for (i = 0; i < nup; i++)  /* copy upvalues to the top */
+            lua_pushvalue(L, -(nup+1));
+        lua_pushcclosure(L, l->func, nup);  /* closure with those upvalues */
+        lua_settable(L, -(nup + 3));
+    }
+    lua_pop(L, nup);  /* remove upvalues */
+}
+#endif /* LUA_VERSION <= 5.1 */
 
 static int lua_spank_table_create (lua_State *L, spank_t sp, int ac, char **av)
 {
@@ -826,7 +843,7 @@ static int lua_spank_table_create (lua_State *L, spank_t sp, int ac, char **av)
     int i;
 
     lua_newtable (L);
-    luaL_register (L, NULL, spank_functions);
+    luaL_setfuncs (L, spank_functions, 0);
 
     /*  Register spank handle as light userdata inside spank table:
      */
