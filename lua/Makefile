@@ -5,7 +5,7 @@ SUBDIRS = \
    lua-schedutils
 
 ifeq ($(HAVE_SPANK_OPTION_GETOPT), 1)
-  EXTRA_CFLAGS = -DHAVE_SPANK_OPTION_GETOPT
+  EXTRA_CFLAGS += -DHAVE_SPANK_OPTION_GETOPT
 endif
 
 all: $(PLUGINS) subdirs
