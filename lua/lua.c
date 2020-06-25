@@ -76,8 +76,8 @@ static List script_option_list = NULL;
  */
 struct lua_script {
     char *path;
-    lua_State *L;
-    int ref;
+    lua_State *L;       /* Copy of global Lua state */
+    int env_ref;        /* reference for _ENV table */
     int fail_on_error;
 };
 List lua_script_list = NULL;
@@ -539,6 +539,17 @@ static int l_spank_job_control_unsetenv (lua_State *L)
     return l_do_unsetenv (L, f);
 }
 
+/*
+ *  Return "global" 'name' from the shadow globals table for this script
+ */
+static void lua_script_getglobal (struct lua_script *s, const char *name)
+{
+    lua_rawgeti (s->L, LUA_REGISTRYINDEX, s->env_ref);
+    lua_getfield (s->L, -1, name);
+    /* Avoid polluting the stack, remove '_ENV' table */
+    lua_remove (s->L, -2);
+}
+
 static int s_opt_find (struct lua_script_option *o, int *pval)
 {
     return (o->s_opt.val == *pval);
@@ -562,7 +573,7 @@ static int lua_spank_option_callback (int val, const char *optarg, int remote)
 
     L = o->script->L;
 
-    lua_getglobal (L, o->l_function);
+    lua_script_getglobal (o->script, o->l_function);
     lua_pushnumber (L, o->l_val);
     lua_pushstring (L, optarg);
     lua_pushboolean (L, remote);
@@ -651,7 +662,7 @@ lua_script_option_create (struct lua_script *script, int i)
         /*
          *  Check for existence of callback function
          */
-        lua_getglobal (L, o->l_function);
+        lua_script_getglobal (o->script, o->l_function);
         if (!lua_isfunction (L, -1))
             luaL_error (L, "Unable to find spank option cb function %s",
                     o->l_function);
@@ -875,7 +886,7 @@ static int lua_spank_call (struct lua_script *s, spank_t sp, const char *fn,
     /*
      * Missing functions are not an error
      */
-    lua_getglobal (L, fn);
+    lua_script_getglobal (s, fn);
     if (lua_isnil (L, -1)) {
         lua_pop (L, 1);
         return (0);
@@ -991,7 +1002,7 @@ int load_spank_options_table (struct lua_script *script, spank_t sp)
     int t;
     lua_State *L = script->L;
 
-    lua_getglobal (L, "spank_options");
+    lua_script_getglobal (script, "spank_options");
     if (lua_isnil (L, -1)) {
         lua_pop (L, 1);
         return (0);
@@ -1034,22 +1045,10 @@ static struct lua_script * lua_script_create (lua_State *L, const char *path)
     struct lua_script *script = malloc (sizeof (*script));
 
     script->path = strdup (path);
-    script->L = lua_newthread (L);
-    script->ref = luaL_ref (L, LUA_REGISTRYINDEX);
+    script->L = L; /* copy of global state */
     script->fail_on_error = 0;
 
-    /*
-     *  Now we need to redefine the globals table for this script/thread.
-     *   this will keep each script's globals in a private namespace,
-     *   (including all the spank callback functions).
-     *   To do this, we define a new table in the current thread's
-     *   state, and give that table's metatable an __index field that
-     *   points to the real globals table, then replace this threads
-     *   globals table with the new (empty) table.
-     *
-     */
-
-    /*  New globals table */
+    /*  New globals table/_ENV for this chunk */
     lua_newtable (script->L);
 
     /*  metatable for table on top of stack */
@@ -1062,16 +1061,14 @@ static struct lua_script * lua_script_create (lua_State *L, const char *path)
      *   table.
      */
     lua_pushstring (script->L, "__index");
-    lua_pushvalue (script->L, LUA_GLOBALSINDEX);
+    lua_getglobal (script->L, "_G");
     lua_settable (script->L, -3);
 
     /*  Now set metatable for the new globals table */
     lua_setmetatable (script->L, -2);
 
-    /*  And finally replace the globals table with the (empty)  table
-     *   now at top of the stack
-     */
-    lua_replace (script->L, LUA_GLOBALSINDEX);
+    /*  Save reference to this table, which will be used as _ENV for chunk */
+    script->env_ref = luaL_ref (script->L, LUA_REGISTRYINDEX);
 
     return script;
 }
@@ -1079,7 +1076,10 @@ static struct lua_script * lua_script_create (lua_State *L, const char *path)
 static void lua_script_destroy (struct lua_script *s)
 {
     free (s->path);
-    luaL_unref (global_L, LUA_REGISTRYINDEX, s->ref);
+    if (s->L) {
+        luaL_unref (s->L, LUA_REGISTRYINDEX, s->env_ref);
+        s->L = NULL;
+    }
     /* Only call lua_close() on the main lua state  */
     free (s);
 }
@@ -1198,8 +1198,8 @@ static int lua_script_valid_in_context (spank_t sp, struct lua_script *script)
 
 #if HAVE_S_CTX_SLURMD
     if (spank_context() == S_CTX_SLURMD) {
-        lua_getglobal (script->L, "slurm_spank_slurmd_init");
-        lua_getglobal (script->L, "slurm_spank_slurmd_exit");
+        lua_script_getglobal (script, "slurm_spank_slurmd_init");
+        lua_script_getglobal (script, "slurm_spank_slurmd_exit");
         if (lua_isnil (script->L, -1) && lua_isnil (script->L, -2))
             valid = 0;
         lua_pop (script->L, 2);
@@ -1207,8 +1207,8 @@ static int lua_script_valid_in_context (spank_t sp, struct lua_script *script)
 #endif
 #if HAVE_S_CTX_JOB_SCRIPT
     if (spank_context() == S_CTX_JOB_SCRIPT) {
-        lua_getglobal (script->L, "slurm_spank_job_prolog");
-        lua_getglobal (script->L, "slurm_spank_job_epilog");
+        lua_script_getglobal (script, "slurm_spank_job_prolog");
+        lua_script_getglobal (script, "slurm_spank_job_epilog");
         if (lua_isnil (script->L, -1) && lua_isnil (script->L, -2))
             valid = 0;
         lua_pop (script->L, 2);
@@ -1216,6 +1216,39 @@ static int lua_script_valid_in_context (spank_t sp, struct lua_script *script)
 #endif
 
     return (valid);
+}
+
+
+static int lua_script_compile (struct lua_script *s)
+{
+    /*
+     *  Load script
+     */
+    if (luaL_loadfile (s->L, s->path)) {
+        print_lua_script_error (s);
+        return -1;
+    }
+
+    /*  Get the environment/globals table for this script from
+     *   the registry and set it as globals table for this chunk
+     */
+    lua_rawgeti (s->L, LUA_REGISTRYINDEX, s->env_ref);
+#if LUA_VERSION_NUM >= 502
+    /* 5.2 and greater: set table as first upvalue: i.e. _ENV */
+    lua_setupvalue (s->L, -2, 1);
+#else
+    /* 5.0, 5.1: Set table as function environment for the chunk */
+    lua_setfenv (s->L, -2);
+#endif
+
+    /*  Now, compile the loaded script
+     */
+    if (lua_pcall (s->L, 0, 0, 0)) {
+        print_lua_script_error (s);
+        return -1;
+    }
+
+    return 0;
 }
 
 
@@ -1283,9 +1316,7 @@ int spank_lua_init (spank_t sp, int ac, char *av[])
         /*
          *  Load script (luaL_loadfile) and compile it (lua_pcall).
          */
-        if (luaL_loadfile (script->L, script->path) ||
-            lua_pcall (script->L, 0, 0, 0)) {
-            print_lua_script_error (script);
+        if (lua_script_compile (script) < 0) {
             if (opt.fail_on_error)
                 return (-1);
             list_remove(i);
