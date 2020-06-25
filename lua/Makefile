@@ -1,9 +1,12 @@
 LUA_VER ?= 5.3
 LUA_LIB ?= -llua$(LUA_VER)
 LUA_INCLUDES ?= -I/usr/include/lua$(LUA_VER)
+LIBLUA_DSO ?= liblua$(LUA_VER).so
 
 PLUGINS = \
    lua.so \
+
+CFLAGS = -g -Wall -DLIBLUA_DSO=\"$(LIBLUA_DSO)\"
 
 ifeq ($(HAVE_SPANK_OPTION_GETOPT), 1)
   EXTRA_CFLAGS += -DHAVE_SPANK_OPTION_GETOPT
