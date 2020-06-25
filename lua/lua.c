@@ -40,6 +40,10 @@
 
 #include "lib/list.h"
 
+#ifndef LIBLUA_DSO
+#define LIBLUA_DSO "liblua.so"
+#endif
+
 SPANK_PLUGIN (lua, 1)
 
 /*  Name of spank_t lightuserdata reference in
@@ -1273,7 +1277,7 @@ int spank_lua_init (spank_t sp, int ac, char *av[])
      *   available globally (so lua doesn't fail to dlopen its
      *   DSOs
      */
-    if (!dlopen ("liblua.so", RTLD_NOW | RTLD_GLOBAL)) {
+    if (!dlopen (LIBLUA_DSO, RTLD_NOW | RTLD_GLOBAL)) {
         slurm_error ("spank/lua: Failed to open liblua.so");
         return (-1);
     }
