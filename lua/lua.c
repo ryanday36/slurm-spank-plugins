@@ -51,6 +51,12 @@ SPANK_PLUGIN (lua, 1)
  */
 #define SPANK_REFNAME "spank"
 
+#if !defined LUA_VERSION_NUM || LUA_VERSION_NUM <= 501
+#define LFORMATTER "string.format(unpack({...}))"
+#else
+#define LFORMATTER "string.format(table.unpack({...}))"
+#endif /* LUA_VERSION <= 5.1 */
+
 /*
  *  This module keeps a list of options provided by the lua
  *   script so that it can easily map the option val (s_opt.val)
@@ -976,16 +982,16 @@ static int SPANK_table_create (lua_State *L)
      *  Create more user-friendly lua versions of SLURM log functions
      *   with lua.
      */
-    luaL_loadstring (L, "SPANK._log_msg (-1, string.format(unpack({...})))");
+    luaL_loadstring (L, "SPANK._log_msg (-1, " LFORMATTER ")");
     lua_setfield (L, -2, "log_error");
 
-    luaL_loadstring (L, "SPANK._log_msg (0, string.format(unpack({...})))");
+    luaL_loadstring (L, "SPANK._log_msg (0, " LFORMATTER ")");
     lua_setfield (L, -2, "log_info");
 
-    luaL_loadstring (L, "SPANK._log_msg (1, string.format(unpack({...})))");
+    luaL_loadstring (L, "SPANK._log_msg (1, " LFORMATTER ")");
     lua_setfield (L, -2, "log_verbose");
 
-    luaL_loadstring (L, "SPANK._log_msg (2, string.format(unpack({...})))");
+    luaL_loadstring (L, "SPANK._log_msg (2, " LFORMATTER ")");
     lua_setfield (L, -2, "log_debug");
 
     /*
