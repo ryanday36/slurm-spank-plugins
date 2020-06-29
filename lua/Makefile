@@ -1,7 +1,14 @@
 LUA_VER ?= 5.3
-LUA_LIB ?= -llua$(LUA_VER)
-LUA_INCLUDES ?= -I/usr/include/lua$(LUA_VER)
-LIBLUA_DSO ?= liblua$(LUA_VER).so
+PKGCONF := pkg-config --silence-errors
+
+LUA_LIB ?= \
+	$(shell $(PKGCONF) --libs lua$(LUA_VER) || $(PKGCONF) --libs lua)
+
+LUA_INCLUDES ?= \
+	$(shell $(PKGCONF) --cflags lua$(LUA_VER) || $(PKGCONF) --cflags lua)
+
+LIBLUA_DSO ?= \
+	$(shell echo $(LUA_LIB) | sed  's/^.*-l\(lua[^ ]*\).*/lib\1.so/')
 
 PLUGINS = \
    lua.so \
