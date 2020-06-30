@@ -1,3 +1,10 @@
+Version 0.39 (2020-06-30)
+- lua: updates for Lua >= 5.2 compatibility
+- lua: remove lua-affinity
+- mpibind: update for hwloc v2+
+- workaround for Slurm inclusion of List typedef
+- fix compilation issue related to -Werror=format-security (Adrien Devresse)
+
 Version 0.38 (2018-05-16)
 - mpibind: fix GPU binding
 
