@@ -1,4 +1,4 @@
---[==========================================================================
+--[[==========================================================================
  *
  *  Copyright (C) 2007-2012 Lawrence Livermore National Security, LLC.
  *  Produced at Lawrence Livermore National Laboratory.
@@ -21,7 +21,7 @@
  *
  *  You should have received a copy of the GNU General Public License
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
--==========================================================================--]
+-==========================================================================--]]
 --
 --  Poor man's OOM detection plugin for SLURM.
 --  

@@ -710,7 +710,16 @@ int slurm_spank_user_init (spank_t sp, int32_t ac, char **av)
     /* Allocate and initialize topology object. */
     hwloc_topology_init (&topology);
 
+#if HWLOC_API_VERSION < 0x20000
     hwloc_topology_set_flags (topology, HWLOC_TOPOLOGY_FLAG_IO_DEVICES);
+#else
+    hwloc_topology_set_io_types_filter (topology,
+                                        HWLOC_TYPE_FILTER_KEEP_IMPORTANT);
+    hwloc_topology_set_cache_types_filter (topology,
+                                           HWLOC_TYPE_FILTER_KEEP_STRUCTURE);
+    hwloc_topology_set_icache_types_filter (topology,
+                                            HWLOC_TYPE_FILTER_KEEP_STRUCTURE);
+#endif
 
     /* Perform the topology detection. */
     hwloc_topology_load (topology);
