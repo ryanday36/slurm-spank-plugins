@@ -25,6 +25,7 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include <stdint.h>
 #include <dlfcn.h>
 #include <glob.h>
 #include <setjmp.h> /* need longjmp for lua_atpanic */
@@ -137,6 +138,9 @@ static struct s_item_name {
     SPANK_ITEM(S_JOB_ALLOC_MEM),
     SPANK_ITEM(S_STEP_ALLOC_CORES),
     SPANK_ITEM(S_STEP_ALLOC_MEM),
+    SPANK_ITEM(S_SLURM_RESTART_COUNT),
+    SPANK_ITEM(S_JOB_ARRAY_ID),
+    SPANK_ITEM(S_JOB_ARRAY_TASK_ID),
     SPANK_ITEM_END
 };
 
@@ -218,13 +222,115 @@ static int name_to_item (const char *name)
 }
 
 /*
- *  Generic function to push a spank item with a numeric representation
+ *  Generic function to push a spank item with an int representation
  *   on to the lua stack.
  */
-static int l_spank_get_item_val (lua_State *L, spank_t sp, spank_item_t item)
+static int l_spank_get_item_int (lua_State *L, spank_t sp, spank_item_t item)
 {
     spank_err_t err;
-    long val;
+    int val=0;
+
+    err = spank_get_item (sp, item, &val);
+    if (err != ESPANK_SUCCESS)
+        return l_spank_error (L, err);
+
+    lua_pushnumber (L, val);
+    return (1);
+}
+
+/*
+ *  Generic function to push a spank item with an uint16 representation
+ *   on to the lua stack.
+ */
+static int l_spank_get_item_uint16 (lua_State *L, spank_t sp, spank_item_t item)
+{
+    spank_err_t err;
+    uint16_t val=0;
+
+    err = spank_get_item (sp, item, &val);
+    if (err != ESPANK_SUCCESS)
+        return l_spank_error (L, err);
+
+    lua_pushnumber (L, val);
+    return (1);
+}
+
+/*
+ *  Generic function to push a spank item with an uint32 representation
+ *   on to the lua stack.
+ */
+static int l_spank_get_item_uint32 (lua_State *L, spank_t sp, spank_item_t item)
+{
+    spank_err_t err;
+    uint32_t val=0;
+
+    err = spank_get_item (sp, item, &val);
+    if (err != ESPANK_SUCCESS)
+        return l_spank_error (L, err);
+
+    lua_pushnumber (L, val);
+    return (1);
+}
+
+/*
+ *  Generic function to push a spank item with an uint64 representation
+ *   on to the lua stack.
+ */
+static int l_spank_get_item_uint64 (lua_State *L, spank_t sp, spank_item_t item)
+{
+    spank_err_t err;
+    uint64_t val=0;
+
+    err = spank_get_item (sp, item, &val);
+    if (err != ESPANK_SUCCESS)
+        return l_spank_error (L, err);
+
+    lua_pushnumber (L, val);
+    return (1);
+}
+
+/*
+ *  Generic function to push a spank item with an uid_t representation
+ *   on to the lua stack.
+ */
+static int l_spank_get_item_uid (lua_State *L, spank_t sp, spank_item_t item)
+{
+    spank_err_t err;
+    uid_t val=0;
+
+    err = spank_get_item (sp, item, &val);
+    if (err != ESPANK_SUCCESS)
+        return l_spank_error (L, err);
+
+    lua_pushnumber (L, val);
+    return (1);
+}
+
+/*
+ *  Generic function to push a spank item with an gid_t representation
+ *   on to the lua stack.
+ */
+static int l_spank_get_item_gid (lua_State *L, spank_t sp, spank_item_t item)
+{
+    spank_err_t err;
+    gid_t val=0;
+
+    err = spank_get_item (sp, item, &val);
+    if (err != ESPANK_SUCCESS)
+        return l_spank_error (L, err);
+
+    lua_pushnumber (L, val);
+    return (1);
+}
+
+/*
+ *  Generic function to push a spank item with an pid_t representation
+ *   on to the lua stack.
+ */
+static int l_spank_get_item_pid (lua_State *L, spank_t sp, spank_item_t item)
+{
+    spank_err_t err;
+    pid_t val=0;
 
     err = spank_get_item (sp, item, &val);
     if (err != ESPANK_SUCCESS)
@@ -355,7 +461,7 @@ l_spank_id_query (lua_State *L, spank_t sp, spank_item_t item)
 static int l_spank_get_exit_status (lua_State *L, spank_t sp)
 {
     spank_err_t err;
-    int status;
+    int status=0;
 
     err = spank_get_item (sp, S_TASK_EXIT_STATUS, &status);
     if (err != ESPANK_SUCCESS)
@@ -395,21 +501,30 @@ static int l_spank_get_item (lua_State *L)
 
     switch (item) {
         case S_JOB_UID:
+            return l_spank_get_item_uid (L, sp, item);
         case S_JOB_GID:
+            return l_spank_get_item_gid (L, sp, item);
+        case S_TASK_PID:
+            return l_spank_get_item_pid (L, sp, item);
+        case S_TASK_ID:
+            return l_spank_get_item_int (L, sp, item);
+        case S_JOB_NCPUS:
+            return l_spank_get_item_uint16 (L, sp, item);
         case S_JOB_ID:
         case S_JOB_STEPID:
         case S_JOB_NNODES:
         case S_JOB_NODEID:
         case S_JOB_LOCAL_TASK_COUNT:
         case S_JOB_TOTAL_TASK_COUNT:
-        case S_JOB_NCPUS:
-        case S_TASK_ID:
         case S_TASK_GLOBAL_ID:
-        case S_TASK_PID:
         case S_STEP_CPUS_PER_TASK:
+        case S_SLURM_RESTART_COUNT:
+        case S_JOB_ARRAY_ID:
+        case S_JOB_ARRAY_TASK_ID:
+            return l_spank_get_item_uint32 (L, sp, item);
         case S_JOB_ALLOC_MEM:
         case S_STEP_ALLOC_MEM:
-            return l_spank_get_item_val (L, sp, item);
+            return l_spank_get_item_uint64 (L, sp, item);
         case S_JOB_ALLOC_CORES:
         case S_STEP_ALLOC_CORES:
         case S_SLURM_VERSION:
